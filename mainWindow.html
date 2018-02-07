@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Electroscout</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.min.css">
+</head>
+<body>
+    <nav>
+        <div class="nav-wrapper">
+            <a class="brand-logo center">Nightscout Data</a>
+        </div>
+    </nav>
+    <table class="striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>SVG</th>
+            </tr>
+        </thead>
+        <tbody id="json">
+        </tbody>
+    </table>
+    <script>
+        const https = require('https');
+        const http = require('http');
+        const crypto = require('crypto');
+        const jsonElement = document.querySelector('#json');
+        const Store = require('electron-store');
+        const store = new Store();
+        const settings = store.get('settings');
+        if (settings) {
+            const hashedNightscoutSecret = crypto.createHash('sha1').update(settings.nightscoutSecret).digest('hex');
+            const options = {
+                host: settings.nightscoutUrl,
+                port: settings.nightscoutPort,
+                path: '/api/v1/entries.json',
+                method: 'GET',
+                headers: {
+                    'API-SECRET': hashedNightscoutSecret
+                }
+            };
+            console.log(options);
+            const connection = settings.nightscoutPort == 80 ? http : https;
+            const req = connection.request(options, (res) => {
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    const result = JSON.parse(chunk);
+                    result.forEach(element => {
+                        jsonElement.innerHTML += `<tr><td>${element.dateString}</td><td>${element.type}</td><td>${element.sgv}</td></tr>`;
+                    });
+                });
+            }).end();
+        }
+    </script>
+</body>
+</html>

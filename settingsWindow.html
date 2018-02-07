@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Settings</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.min.css">
+</head>
+<body>
+    <div class="container">
+        <form>
+            <div style="height: 20px"></div>
+            <div>
+                <label>Nightscout URL</label>
+                <input type="text" id="nightscoutUrl" autofocus>
+            </div>
+            <div>
+                <label>Nightscout Port</label>
+                <p>
+                    <input class="with-gap" name="nightscoutPort" type="radio" id="port443" value="443" checked/>
+                    <label for="port443">https (443)</label>
+                </p>
+                <p>
+                    <input class="with-gap" name="nightscoutPort" type="radio" id="port80" value="80" />
+                    <label for="port80">http (80)</label>
+                </p>
+            </div>
+            <div style="height: 20px"></div>
+            <div>
+                <label>Nightscout Secret</label>
+                <input type="text" id="nightscoutSecret">
+            </div>
+            <button class="btn waves-effect waves-light" type="submit">Save</button>
+        </form>
+    </div>
+    <script>
+        const electron = require('electron');
+        const {ipcRenderer} = electron;
+
+        const Store = require('electron-store');
+        const store = new Store();
+        const settings = store.get('settings');
+        document.querySelector('#nightscoutUrl').value = settings ? settings.nightscoutUrl : '';
+        document.querySelector('#nightscoutSecret').value = settings ? settings.nightscoutSecret : '';
+        if (settings && settings.nightscoutPort == '80') {
+            document.querySelector('#port80').setAttribute('checked', null);
+        }
+        console.log(settings);
+        document.querySelector('form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nightscoutUrl = document.querySelector('#nightscoutUrl').value;
+            const nightscoutPort = document.querySelector('input[name=nightscoutPort]:checked').value;
+            const nightscoutSecret = document.querySelector('#nightscoutSecret').value;
+            store.set('settings.nightscoutUrl', nightscoutUrl);
+            store.set('settings.nightscoutPort', nightscoutPort);
+            store.set('settings.nightscoutSecret', nightscoutSecret);
+            ipcRenderer.send('settings:save');
+        });
+    </script>
+</body>
+</html>
