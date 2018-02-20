@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Electroscout</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.min.css">
 </head>
@@ -14,43 +15,83 @@
         <thead>
             <tr>
                 <th>Date</th>
-                <th>Type</th>
-                <th>SVG</th>
+                <th>Value</th>
+                <th>Direction</th>
             </tr>
         </thead>
         <tbody id="json">
         </tbody>
     </table>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h4 id="modalTitle"></h4>
+            <p id="modalBody"></p>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-action modal-close waves-effect waves-green btn-flat">OK</a>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.5/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.20.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+    <script src="utils.js"></script>
     <script>
         const https = require('https');
         const http = require('http');
         const crypto = require('crypto');
-        const jsonElement = document.querySelector('#json');
-        const Store = require('electron-store');
-        const store = new Store();
-        const settings = store.get('settings');
-        if (settings) {
-            const hashedNightscoutSecret = crypto.createHash('sha1').update(settings.nightscoutSecret).digest('hex');
-            const options = {
-                host: settings.nightscoutUrl,
-                port: settings.nightscoutPort,
-                path: '/api/v1/entries.json',
-                method: 'GET',
-                headers: {
-                    'API-SECRET': hashedNightscoutSecret
-                }
-            };
-            console.log(options);
-            const connection = settings.nightscoutPort == 80 ? http : https;
-            const req = connection.request(options, (res) => {
-                res.setEncoding('utf8');
-                res.on('data', (chunk) => {
-                    const result = JSON.parse(chunk);
-                    result.forEach(element => {
-                        jsonElement.innerHTML += `<tr><td>${element.dateString}</td><td>${element.type}</td><td>${element.sgv}</td></tr>`;
+        const jsonElement = $('#json');
+        const titleElement = $('head title');
+        $(document).ready(() => {
+            refreshData();
+            setInterval(refreshData, 60000);
+        });
+        ipcRenderer.on('main:refresh', function(e, item) {
+            console.log("ee");
+            refreshData();
+        });
+        function refreshData() {
+            if (settings) {
+                const hashedNightscoutSecret = crypto.createHash('sha1').update(settings.nightscoutSecret).digest('hex');
+                var options = {
+                    host: settings.nightscoutUrl,
+                    port: settings.nightscoutPort,
+                    method: 'GET',
+                    headers: {
+                        'API-SECRET': hashedNightscoutSecret
+                    }
+                };
+                const connection = settings.nightscoutPort == 80 ? http : https;
+                options.path = '/api/v1/profile.json';
+                connection.request(options, (res) => {
+                    res.setEncoding('utf8');
+                    res.on('data', (settingsData) => {
+                        serverSettings = JSON.parse(settingsData)[0];
+                        options.path = '/api/v1/entries.json';
+                        connection.request(options, (res) => {
+                            res.setEncoding('utf8');
+                            res.on('data', (entriesData) => {
+                                const result = JSON.parse(entriesData);
+                                const sgvs = _.filter(result, (x) => { return x.type == 'sgv' });
+                                jsonElement.empty();
+                                titleElement.html(displaySgv(sgvs[0].sgv) + ' ' + displayDelta(sgvs[0].sgv, sgvs[1].sgv) + ' ' + displayDirection(sgvs[0].direction));
+                                _.each(sgvs, (element) => {
+                                    const date = moment(element.dateString).fromNow();
+                                    const sgv = displaySgv(element.sgv);
+                                    const direction = displayDirection(element.direction);
+                                    jsonElement.append('<tr><td>' + date + '</td><td>' + sgv + '</td><td>' + direction + '</td></tr>');
+                                });
+                            });
+                        }).end();
                     });
-                });
-            }).end();
+                }).on('error', (error) => {
+                    $('#modalTitle').text('Error');
+                    $('#modalBody').text('Cannot connect to Nightscout, check your settings.');
+                    $('#modal').modal();
+                    $('#modal').modal('open');
+                }).end();
+            }
         }
     </script>
 </body>

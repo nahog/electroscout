@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Settings</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.min.css">
 </head>
@@ -31,19 +32,13 @@
             <button class="btn waves-effect waves-light" type="submit">Save</button>
         </form>
     </div>
+    <script src="utils.js"></script>
     <script>
-        const electron = require('electron');
-        const {ipcRenderer} = electron;
-
-        const Store = require('electron-store');
-        const store = new Store();
-        const settings = store.get('settings');
         document.querySelector('#nightscoutUrl').value = settings ? settings.nightscoutUrl : '';
-        document.querySelector('#nightscoutSecret').value = settings ? settings.nightscoutSecret : '';
+        document.querySelector('#nightscoutSecret').value = settings ? settings.nightscoutSecret : '';                
         if (settings && settings.nightscoutPort == '80') {
             document.querySelector('#port80').setAttribute('checked', null);
         }
-        console.log(settings);
         document.querySelector('form').addEventListener('submit', (e) => {
             e.preventDefault();
             const nightscoutUrl = document.querySelector('#nightscoutUrl').value;

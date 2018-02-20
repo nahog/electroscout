@@ -12,7 +12,7 @@ const path = require('path');
 const {app, BrowserWindow, Menu, ipcMain} = electron;
 
 // Set environment
-//process.env.NODE_ENV = 'production';
+process.env.NODE_ENV = 'production';
 
 let mainWindow;
 let settingsWindow;
@@ -64,7 +64,7 @@ const mainMenuTemplate = [
                         settingsWindow = null;
                     })
 
-                    //settingsWindow.setMenu(null);
+                    settingsWindow.setMenu(null);
 
                     // Load html into the window
                     settingsWindow.loadURL(url.format({
