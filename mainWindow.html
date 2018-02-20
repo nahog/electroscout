@@ -47,10 +47,7 @@
             refreshData();
             setInterval(refreshData, 60000);
         });
-        ipcRenderer.on('main:refresh', function(e, item) {
-            console.log("ee");
-            refreshData();
-        });
+        ipcRenderer.on('main:refresh', refreshData);
         function refreshData() {
             if (settings) {
                 const hashedNightscoutSecret = crypto.createHash('sha1').update(settings.nightscoutSecret).digest('hex');

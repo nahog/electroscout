@@ -41,6 +41,7 @@ app.on('ready', () => {
 
 // Catch ipc events
 ipcMain.on('settings:save', () => {
+    mainWindow.webContents.send('main:refresh');
     settingsWindow.close();
 });
 
@@ -49,6 +50,13 @@ const mainMenuTemplate = [
     {
         label: 'File',
         submenu: [
+            {
+                label: 'Refresh',
+                accelerator: 'F5',
+                click() {
+                    mainWindow.webContents.send('main:refresh');
+                }
+            },
             {
                 label: 'Settings...',
                 click() {
