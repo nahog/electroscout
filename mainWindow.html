@@ -47,6 +47,70 @@
             refreshData();
             setInterval(refreshData, 60000);
         });
+
+        /*
+        // Test data for tray icon
+        const testData = [
+            {direction:'Flat', value:1},
+            {direction:'Flat', value:4},
+            {direction:'Flat', value:7},
+            {direction:'Flat', value:11},
+            {direction:'Flat', value:19},
+            {direction:'FortyFiveUp', value:1},
+            {direction:'FortyFiveUp', value:4},
+            {direction:'FortyFiveUp', value:7},
+            {direction:'FortyFiveUp', value:11},
+            {direction:'FortyFiveUp', value:19},
+            {direction:'SingleUp', value:1},
+            {direction:'SingleUp', value:4},
+            {direction:'SingleUp', value:7},
+            {direction:'SingleUp', value:11},
+            {direction:'SingleUp', value:19},
+            {direction:'DoubleUp', value:1},
+            {direction:'DoubleUp', value:4},
+            {direction:'DoubleUp', value:7},
+            {direction:'DoubleUp', value:11},
+            {direction:'DoubleUp', value:19},
+            {direction:'FortyFiveDown', value:1},
+            {direction:'FortyFiveDown', value:4},
+            {direction:'FortyFiveDown', value:7},
+            {direction:'FortyFiveDown', value:11},
+            {direction:'FortyFiveDown', value:19},
+            {direction:'SingleDown', value:1},
+            {direction:'SingleDown', value:4},
+            {direction:'SingleDown', value:7},
+            {direction:'SingleDown', value:11},
+            {direction:'SingleDown', value:19},
+            {direction:'DoubleDown', value:1},
+            {direction:'DoubleDown', value:4},
+            {direction:'DoubleDown', value:7},
+            {direction:'DoubleDown', value:11},
+            {direction:'DoubleDown', value:19},
+            {direction:'NONE', value:1},
+            {direction:'NONE', value:4},
+            {direction:'NONE', value:7},
+            {direction:'NONE', value:11},
+            {direction:'NONE', value:19},
+            {direction:'NOT COMPUTABLE', value:1},
+            {direction:'NOT COMPUTABLE', value:4},
+            {direction:'NOT COMPUTABLE', value:7},
+            {direction:'NOT COMPUTABLE', value:11},
+            {direction:'NOT COMPUTABLE', value:19},
+            {direction:'RATE OUT OF RANGE', value:1},
+            {direction:'RATE OUT OF RANGE', value:4},
+            {direction:'RATE OUT OF RANGE', value:7},
+            {direction:'RATE OUT OF RANGE', value:11},
+            {direction:'RATE OUT OF RANGE', value:19},
+        ];
+        let index = 0;
+        setInterval(() => {
+            ipcRenderer.send('glucose:update', {direction: testData[index].direction, text: testData[index].value + ' ' + testData[index].direction, value: testData[index].value, targets: {veryHigh:15, high:10, low:5, veryLow:3}});
+            titleElement.html(testData[index].value + ' ' + testData[index].direction);
+            index++;
+            if (index == testData.length) index = 0;
+        }, 2000);
+        */
+
         ipcRenderer.on('main:refresh', refreshData);
         function refreshData() {
             if (settings) {
@@ -65,6 +129,12 @@
                     res.setEncoding('utf8');
                     res.on('data', (settingsData) => {
                         serverSettings = JSON.parse(settingsData)[0];
+                        const targets = {
+                            veryHigh: serverSettings.store.Default.target_high[0].value*1.5,
+                            high: serverSettings.store.Default.target_high[0].value*1,
+                            veryLow: serverSettings.store.Default.target_low[0].value*0.5,
+                            low: serverSettings.store.Default.target_low[0].value*1
+                        }
                         options.path = '/api/v1/entries.json';
                         connection.request(options, (res) => {
                             res.setEncoding('utf8');
@@ -72,7 +142,10 @@
                                 const result = JSON.parse(entriesData);
                                 const sgvs = _.filter(result, (x) => { return x.type == 'sgv' });
                                 jsonElement.empty();
-                                titleElement.html(displaySgv(sgvs[0].sgv) + ' ' + displayDelta(sgvs[0].sgv, sgvs[1].sgv) + ' ' + displayDirection(sgvs[0].direction));
+                                const minutesAgo = moment.duration(moment().diff(moment(sgvs[0].dateString))).minutes();
+                                const currentInfo = displaySgv(sgvs[0].sgv) + ' ' + displayDirection(sgvs[0].direction) + ' ' + displayDelta(sgvs[0].sgv, sgvs[1].sgv) + ' ' + displayUnits() + ' [' + minutesAgo + 'm]';
+                                titleElement.html(currentInfo);
+                                ipcRenderer.send('glucose:update', {direction: sgvs[0].direction, text: currentInfo, value: displaySgv(sgvs[0].sgv), targets: targets});
                                 _.each(sgvs, (element) => {
                                     const date = moment(element.dateString).fromNow();
                                     const sgv = displaySgv(element.sgv);

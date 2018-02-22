@@ -1,7 +1,7 @@
 {
   "name": "electroscout",
   "productName": "Electroscout",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Electron desktop client for NightScout",
   "main": "main.js",
   "scripts": {

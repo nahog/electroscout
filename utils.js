@@ -5,10 +5,19 @@ const store = new Store();
 const settings = store.get('settings');
 var serverSettings = null;
 
+function displayUnits() {
+    if (serverSettings) {
+        if (serverSettings.units == 'mmol') {
+            return 'mmol/L';
+        }
+    }
+    return 'mg/dL';
+}
+
 function displaySgv(sgv) {
     if (serverSettings) {
         if (serverSettings.units == 'mmol') {
-            return Math.round(sgv * 10.0 / 18.0) / 10;
+            return Math.round(sgv * 10.0 / 18.0) / 10.0;
         }
         return sgv;
     }
@@ -18,8 +27,8 @@ function displaySgv(sgv) {
 function displayDelta(sgv0, sgv1) {
     if (serverSettings) {
         if (serverSettings.units == 'mmol') {
-            const sgv0diplay =  Math.round(sgv0 * 10.0 / 18.0) / 10;
-            const sgv1diplay =  Math.round(sgv1 * 10.0 / 18.0) / 10;
+            const sgv0diplay =  Math.round(sgv0 * 100.0 / 18.0) / 100.0;
+            const sgv1diplay =  Math.round(sgv1 * 100.0 / 18.0) / 100.0;
             return formatDelta(sgv0diplay - sgv1diplay);
         }
         return formatDelta(sgv0 - sgv1);
@@ -29,9 +38,9 @@ function displayDelta(sgv0, sgv1) {
 
 function formatDelta(delta) {
     if (delta >= 0) {
-        return '+' + Math.round(delta * 10) / 10;
+        return '+' + Math.round(delta * 100) / 100;
     }
-    return Math.round(delta * 10) / 10;
+    return Math.round(delta * 100) / 100;
 }
 
 const dir2Char = {
