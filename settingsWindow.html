@@ -29,24 +29,72 @@
                 <label>Nightscout Secret</label>
                 <input type="text" id="nightscoutSecret">
             </div>
+            <div>
+                <label>Tray icons</label>
+                <p>
+                    <input class="with-gap" name="trayArrow" type="checkbox" id="trayArrow"/>
+                    <label for="trayArrow">Show trend arrow in tray</label>
+                </p>
+                <p>
+                    <input class="with-gap" name="trayAlarm" type="checkbox" id="trayAlarm"/>
+                    <label for="trayAlarm">Show alarm icon in tray</label>
+                </p>
+                <p style="display: none">
+                    <input class="with-gap" name="trayValue" type="checkbox" id="trayValue"/>
+                    <label for="trayValue">Show glucose value in tray</label>
+                </p>
+                <p>
+                    <input class="with-gap" name="trayMinimize" type="checkbox" id="trayMinimize"/>
+                    <label for="trayMinimize">Minimize to tray</label>
+                </p>
+            </div>
+            <div style="height: 20px"></div>
             <button class="btn waves-effect waves-light" type="submit">Save</button>
+            <div style="height: 20px"></div>
         </form>
     </div>
-    <script src="utils.js"></script>
     <script>
+        const {ipcRenderer} = require('electron');
+        const Store = require('electron-store');
+
+        const store = new Store();
+        const settings = store.get('settings');
+
         document.querySelector('#nightscoutUrl').value = settings ? settings.nightscoutUrl : '';
         document.querySelector('#nightscoutSecret').value = settings ? settings.nightscoutSecret : '';                
-        if (settings && settings.nightscoutPort == '80') {
-            document.querySelector('#port80').setAttribute('checked', null);
-        }
+        if (settings) {
+            if (settings.nightscoutPort == '80') {
+                document.querySelector('#port80').setAttribute('checked', null);
+            }
+            if (settings.trayArrow == true) {
+                document.querySelector('#trayArrow').setAttribute('checked', 'checked');
+            }
+            if (settings.trayAlarm == true) {
+                document.querySelector('#trayAlarm').setAttribute('checked', 'checked');
+            }
+            if (settings.trayValue == true) {
+                document.querySelector('#trayValue').setAttribute('checked', 'checked');
+            }
+            if (settings.trayMinimize == true) {
+                document.querySelector('#trayMinimize').setAttribute('checked', 'checked');
+            }
+        } 
         document.querySelector('form').addEventListener('submit', (e) => {
             e.preventDefault();
             const nightscoutUrl = document.querySelector('#nightscoutUrl').value;
             const nightscoutPort = document.querySelector('input[name=nightscoutPort]:checked').value;
             const nightscoutSecret = document.querySelector('#nightscoutSecret').value;
+            const trayArrow = document.querySelector('#trayArrow').checked;
+            const trayAlarm = document.querySelector('#trayAlarm').checked;
+            const trayValue = document.querySelector('#trayValue').checked;
+            const trayMinimize = document.querySelector('#trayMinimize').checked;
             store.set('settings.nightscoutUrl', nightscoutUrl);
             store.set('settings.nightscoutPort', nightscoutPort);
             store.set('settings.nightscoutSecret', nightscoutSecret);
+            store.set('settings.trayArrow', trayArrow);
+            store.set('settings.trayAlarm', trayAlarm);
+            store.set('settings.trayValue', trayValue);
+            store.set('settings.trayMinimize', trayMinimize);
             ipcRenderer.send('settings:save');
         });
     </script>

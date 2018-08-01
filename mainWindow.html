@@ -11,6 +11,9 @@
             <a class="brand-logo center">Nightscout Data</a>
         </div>
     </nav>
+    <div style="height: 20px"></div>
+    <div id="container" style="height: 300px; min-width: 310px"></div>
+    <div style="height: 2px; background-color: #ee6e73"></div>
     <table class="striped">
         <thead>
             <tr>
@@ -36,20 +39,29 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.20.1/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
-    <script src="utils.js"></script>
     <script>
+        const highcharts = require('highcharts');
         const https = require('https');
         const http = require('http');
         const crypto = require('crypto');
+        const {ipcRenderer} = require('electron');
+        const Store = require('electron-store');
+
+        const utils = require('./utils');
+
+        const store = new Store();
+        const settings = store.get('settings');
         const jsonElement = $('#json');
         const titleElement = $('head title');
+        const offset = moment().utcOffset();
+
         $(document).ready(() => {
             refreshData();
             setInterval(refreshData, 60000);
         });
 
         /*
-        // Test data for tray icon
+        // Test data for the tray icons
         const testData = [
             {direction:'Flat', value:1},
             {direction:'Flat', value:4},
@@ -115,7 +127,7 @@
         function refreshData() {
             if (settings) {
                 const hashedNightscoutSecret = crypto.createHash('sha1').update(settings.nightscoutSecret).digest('hex');
-                var options = {
+                let options = {
                     host: settings.nightscoutUrl,
                     port: settings.nightscoutPort,
                     method: 'GET',
@@ -128,7 +140,7 @@
                 connection.request(options, (res) => {
                     res.setEncoding('utf8');
                     res.on('data', (settingsData) => {
-                        serverSettings = JSON.parse(settingsData)[0];
+                        let serverSettings = JSON.parse(settingsData)[0];
                         const targets = {
                             veryHigh: serverSettings.store.Default.target_high[0].value*1.5,
                             high: serverSettings.store.Default.target_high[0].value*1,
@@ -143,14 +155,53 @@
                                 const sgvs = _.filter(result, (x) => { return x.type == 'sgv' });
                                 jsonElement.empty();
                                 const minutesAgo = moment.duration(moment().diff(moment(sgvs[0].dateString))).minutes();
-                                const currentInfo = displaySgv(sgvs[0].sgv) + ' ' + displayDirection(sgvs[0].direction) + ' ' + displayDelta(sgvs[0].sgv, sgvs[1].sgv) + ' ' + displayUnits() + ' [' + minutesAgo + 'm]';
+                                const currentInfo = utils.displaySgv(serverSettings, sgvs[0].sgv) + ' ' + utils.displayDirection(sgvs[0].direction) + ' ' + utils.displayDelta(serverSettings, sgvs[0].sgv, sgvs[1].sgv) + ' ' + utils.displayUnits(serverSettings) + ' [' + minutesAgo + 'm]';
                                 titleElement.html(currentInfo);
-                                ipcRenderer.send('glucose:update', {direction: sgvs[0].direction, text: currentInfo, value: displaySgv(sgvs[0].sgv), targets: targets});
+                                ipcRenderer.send('glucose:update', {direction: sgvs[0].direction, text: currentInfo, value: utils.displaySgv(serverSettings, sgvs[0].sgv), targets: targets});
+                                let graphData = [];
                                 _.each(sgvs, (element) => {
-                                    const date = moment(element.dateString).fromNow();
-                                    const sgv = displaySgv(element.sgv);
-                                    const direction = displayDirection(element.direction);
+                                    const momentDate = moment(element.dateString);
+                                    const momentDateLocal = momentDate.clone().add(offset, 'minutes');
+                                    const date = momentDate.fromNow();
+                                    const sgv = utils.displaySgv(serverSettings, element.sgv);
+                                    const direction = utils.displayDirection(element.direction);
                                     jsonElement.append('<tr><td>' + date + '</td><td>' + sgv + '</td><td>' + direction + '</td></tr>');
+                                    graphData.push([momentDateLocal.valueOf(), sgv]);
+                                });
+                                graphData.sort((a, b) => a[0] < b[0] ? -1 : 1);
+                                highcharts.chart('container', {
+                                    chart: { type: 'spline' },
+                                    title: { text: '' },
+                                    xAxis: {
+                                        type: 'datetime',
+                                        title: {
+                                            text: 'Time (HH:MM)'
+                                        }
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: 'Glucose (' + utils.displayUnits(serverSettings) + ')'
+                                        },
+                                        min: 0
+                                    },
+                                    tooltip: {
+                                        headerFormat: '<b>{series.name}</b><br>',
+                                        pointFormat: '{point.x:%H:%M}: {point.y:.2f} ' + utils.displayUnits(serverSettings)
+                                    },
+                                    plotOptions: {
+                                        spline: {
+                                            marker: {
+                                                enabled: true
+                                            }
+                                        }
+                                    },
+                                    colors: ['#ee6e73'],
+                                    series: [{
+                                        showInLegend: false,
+                                        name: "Blood Glucose level",
+                                        data: graphData
+                                    }],
+                                    credits: { enabled: false }
                                 });
                             });
                         }).end();

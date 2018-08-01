@@ -8,9 +8,7 @@
 // Functional
 // TODO: See if we can use some data from the server for the very high / very low targets (instead of 50% more of the high / low)
 // TODO: Get alarms from the server
-// TODO: Show data in a graph instead of text
 // TODO: Show other events apart from sgv
-// TODO: Minimize to tray setting
 
 // Handle setupevents as quickly as possible
 const setupEvents = require('./installers/setupEvents')
@@ -19,19 +17,35 @@ if (setupEvents.handleSquirrelEvent()) {
    return;
 }
 
-const electron = require('electron');
+const {app, BrowserWindow, Menu, ipcMain, Tray, nativeImage} = require('electron');
 const url = require('url');
 const path = require('path');
+const Store = require('electron-store');
 
-const {app, BrowserWindow, Menu, ipcMain, Tray, nativeImage} = electron;
+const store = new Store();
+let settings = store.get('settings');
 
 // Set environment (comment during development to enable inspector)
 process.env.NODE_ENV = 'production';
 
 let mainWindow;
 let settingsWindow;
-let contextMenu;
-let tray;
+let trayArrow = null;
+let trayAlarm = null;
+let trayValue = null;
+
+const contextMenu = Menu.buildFromTemplate([
+    {
+        label: 'Show', click: () => {
+            mainWindow.show();
+        } 
+    },
+    { 
+        label: 'Quit', click: () => {
+            app.quit();
+        }
+    }
+]);
 
 const noneNativeImage = nativeImage.createFromPath(path.join(__dirname, 'assets/icons/arrows/none.png'));
 
@@ -61,6 +75,12 @@ const veryOutFlatNativeImage = nativeImage.createFromPath(path.join(__dirname, '
 const veryOutHalfDownNativeImage = nativeImage.createFromPath(path.join(__dirname, 'assets/icons/arrows/very-out-half-down.png'));
 const veryOutDownNativeImage = nativeImage.createFromPath(path.join(__dirname, 'assets/icons/arrows/very-out-down.png'));
 const veryOutDownDownNativeImage = nativeImage.createFromPath(path.join(__dirname, 'assets/icons/arrows/very-out-down-down.png'));
+
+const veryAlarmNativeImage =  nativeImage.createFromPath(path.join(__dirname, 'assets/icons/alarms/very-alarm.png'));
+const alarmNativeImage =  nativeImage.createFromPath(path.join(__dirname, 'assets/icons/alarms/alarm.png'));
+const noAlarmNativeImage =  nativeImage.createFromPath(path.join(__dirname, 'assets/icons/alarms/no-alarm.png'));
+
+const genericValueNativeImage =  nativeImage.createFromPath(path.join(__dirname, 'assets/icons/values/generic.png'));
 
 // Direction to tray icon
 const dir2ImageInRange = {
@@ -103,8 +123,9 @@ const dir2ImageVeryOutOfRange = {
 // Listen for the app to be ready
 app.on('ready', () => {
     // Tray icon
-    tray = new Tray(noneNativeImage);
-    tray.setToolTip('Updating glucose value...');
+    createTrayArrow(settings);
+    createTrayAlarm(settings);
+    createTrayValue(settings);
 
     // Create new window
     mainWindow = new BrowserWindow({});
@@ -121,28 +142,101 @@ app.on('ready', () => {
         app.quit();
     });
 
+    mainWindow.on('minimize',function(event){
+        if (settings &&  settings.trayMinimize) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
+
     // Build menu from teplate
     const mainMenu = Menu.buildFromTemplate(mainMenuTemplate)
     Menu.setApplicationMenu(mainMenu);
+});
+
+app.on('quit', function() {
+    destroyTrayArrow();
+    destroyTrayAlarm();
+    destroyTrayValue();
 });
 
 // Catch ipc events
 ipcMain.on('settings:save', () => {
     mainWindow.webContents.send('main:refresh');
     settingsWindow.close();
+    settings = store.get('settings');
+    createTrayArrow(settings);
+    createTrayAlarm(settings);
+    createTrayValue(settings);
+    if (settings && !settings.trayArrow && trayArrow !== null) destroyTrayArrow();
+    if (settings && !settings.trayAlarm && trayAlarm !== null) destroyTrayAlarm();
+    if (settings && !settings.trayValue && trayValue !== null) destroyTrayValue();
 });
 ipcMain.on('glucose:update', (context, data) => {
     if (data.value >= data.targets.veryHigh || data.value <= data.targets.veryLow) {
-        tray.setImage(dir2ImageVeryOutOfRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayArrow && trayArrow) trayArrow.setImage(dir2ImageVeryOutOfRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayAlarm && trayAlarm) trayAlarm.setImage(veryAlarmNativeImage || asteriskNativeImage);
+        if (settings && settings.trayValue && trayValue) trayValue.setImage(genericValueNativeImage || asteriskNativeImage);
     }
     else if (data.value >= data.targets.high || data.value <= data.targets.low) {
-        tray.setImage(dir2ImageOutOfRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayArrow && trayArrow) trayArrow.setImage(dir2ImageOutOfRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayAlarm && trayAlarm) trayAlarm.setImage(alarmNativeImage || asteriskNativeImage);
+        if (settings && settings.trayValue && trayValue) trayValue.setImage(genericValueNativeImage || asteriskNativeImage);
     }
     else {
-        tray.setImage(dir2ImageInRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayArrow && trayArrow) trayArrow.setImage(dir2ImageInRange[data.direction] || asteriskNativeImage);
+        if (settings && settings.trayAlarm && trayAlarm) trayAlarm.setImage(noAlarmNativeImage || asteriskNativeImage);
+        if (settings && settings.trayValue && trayValue) trayValue.setImage(genericValueNativeImage || asteriskNativeImage);
     }
-    tray.setToolTip(data.text);
+    if (settings && settings.trayArrow && trayArrow) trayArrow.setToolTip(data.text);
+    if (settings && settings.trayAlarm && trayAlarm) trayAlarm.setToolTip(data.text);
+    if (settings && settings.trayValue && trayValue) trayValue.setToolTip(data.text);
 });
+
+function createTrayArrow(settings) {
+    if (settings && settings.trayArrow && trayArrow === null) {
+        trayArrow = new Tray(noneNativeImage);
+        trayArrow.setContextMenu(contextMenu)
+        trayArrow.setToolTip('Updating glucose value...');
+    }
+}
+
+function createTrayAlarm(settings) {
+    if (settings && settings.trayAlarm && trayAlarm === null) {
+        trayAlarm = new Tray(noneNativeImage);
+        trayAlarm.setContextMenu(contextMenu)
+        trayAlarm.setToolTip('Updating glucose value...');
+    }
+}
+
+function createTrayValue(settings) {
+    if (settings && settings.trayValue && trayValue === null) {
+        trayValue = new Tray(noneNativeImage);
+        trayValue.setContextMenu(contextMenu)
+        trayValue.setToolTip('Updating glucose value...');
+    }
+}
+
+function destroyTrayArrow() {
+    if (trayArrow) {
+        trayArrow.destroy()
+        trayArrow = null;
+    }
+}
+
+function destroyTrayAlarm() {
+    if (trayAlarm) {
+        trayAlarm.destroy()
+        trayAlarm = null;
+    }
+}
+
+function destroyTrayValue() {
+    if (trayValue) {
+        trayValue.destroy()
+        trayValue = null;
+    }
+}
 
 // Create menu template
 const mainMenuTemplate = [
@@ -162,14 +256,14 @@ const mainMenuTemplate = [
                     // Create new window
                     settingsWindow = new BrowserWindow({
                         width: 350,
-                        height: 430,
+                        height: 560,
                         title: 'Settings'
                     });
 
                     // Garbage collection handle
                     settingsWindow.on('close', () => {
                         settingsWindow = null;
-                    })
+                    });
 
                     settingsWindow.setMenu(null);
 
@@ -193,7 +287,7 @@ const mainMenuTemplate = [
 ];
 
 // Fix menu for mac
-if (process.platform == 'darwin') {
+if (process.platform === 'darwin') {
     mainMenuTemplate.unshift({});
 }
 
