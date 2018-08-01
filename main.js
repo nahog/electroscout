@@ -196,7 +196,8 @@ ipcMain.on('glucose:update', (context, data) => {
 function createTrayArrow(settings) {
     if (settings && settings.trayArrow && trayArrow === null) {
         trayArrow = new Tray(noneNativeImage);
-        trayArrow.setContextMenu(contextMenu)
+        trayArrow.setContextMenu(contextMenu);
+        trayArrow.on('click', () => mainWindow.show());
         trayArrow.setToolTip('Updating glucose value...');
     }
 }
@@ -204,7 +205,8 @@ function createTrayArrow(settings) {
 function createTrayAlarm(settings) {
     if (settings && settings.trayAlarm && trayAlarm === null) {
         trayAlarm = new Tray(noneNativeImage);
-        trayAlarm.setContextMenu(contextMenu)
+        trayAlarm.setContextMenu(contextMenu);
+        trayAlarm.on('click', () => mainWindow.show());
         trayAlarm.setToolTip('Updating glucose value...');
     }
 }
@@ -212,7 +214,8 @@ function createTrayAlarm(settings) {
 function createTrayValue(settings) {
     if (settings && settings.trayValue && trayValue === null) {
         trayValue = new Tray(noneNativeImage);
-        trayValue.setContextMenu(contextMenu)
+        trayValue.setContextMenu(contextMenu);
+        trayValue.on('click', () => mainWindow.show());
         trayValue.setToolTip('Updating glucose value...');
     }
 }
